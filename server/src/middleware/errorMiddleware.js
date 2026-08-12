@@ -1,7 +1,10 @@
 export const notFound = (req, res) => {
+    const isFileRequest = req.path.startsWith("/uploads");
     res.status(404).json({
         success: false,
-        message: `Route not found: ${req.method} ${req.originalUrl}`,
+        message: isFileRequest
+            ? `File not found: ${req.method} ${req.originalUrl}`
+            : `Route not found: ${req.method} ${req.originalUrl}`,
     });
 };
 

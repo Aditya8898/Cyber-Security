@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import PDFDocument from "pdfkit";
 
 import Certificate from "../../models/Certificate.js";
@@ -8,10 +6,16 @@ import Enrollment from "../../models/Enrollment.js";
 import generateCertificateId from "../../utils/generateCertificateId.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import AppError from "../../utils/AppError.js";
+import { getGridFSBucket } from "../../config/gridfs.js";
 
-const writePdf = (doc, filePath) =>
+const writePdf = (doc, bucket, gridFileName) =>
     new Promise((resolve, reject) => {
-        const stream = fs.createWriteStream(filePath);
+        const stream = bucket.openUploadStream(gridFileName, {
+            metadata: {
+                folder: "certificates",
+                contentType: "application/pdf",
+            },
+        });
 
         stream.on("finish", resolve);
         stream.on("error", reject);
@@ -108,22 +112,16 @@ export const generateCertificate = asyncHandler(async (req, res) => {
 
     const certificateId = generateCertificateId();
 
-    const folderPath = path.join(process.cwd(), "uploads", "certificates");
-
-    if (!fs.existsSync(folderPath)) {
-        fs.mkdirSync(folderPath, { recursive: true });
-    }
-
     const fileName = `${certificateId}.pdf`;
 
-    const filePath = path.join(folderPath, fileName);
+    const bucket = getGridFSBucket();
 
     const doc = new PDFDocument();
     doc.userName = result.user.name;
     doc.workshopTitle = result.workshop.title;
     doc.certificateId = certificateId;
 
-    await writePdf(doc, filePath);
+    await writePdf(doc, bucket, `certificates/${fileName}`);
 
     const certificate = await Certificate.create({
         user: result.user._id,
@@ -167,15 +165,30 @@ export const downloadCertificate = asyncHandler(async (req, res) => {
         throw new AppError("Not authorized to download this certificate", 403);
     }
 
-    const filePath = path.join(process.cwd(), certificate.pdfUrl);
+    const bucket = getGridFSBucket();
 
-    if (!fs.existsSync(filePath)) {
+    const gridFileName = certificate.pdfUrl.replace(/^\/uploads\//, "");
+
+    const [file] = await bucket
+        .find({ filename: gridFileName })
+        .limit(1)
+        .toArray();
+
+    if (!file) {
         throw new AppError("Certificate file not found", 404);
     }
 
-    res.download(filePath, `${certificate.certificateId}.pdf`, (err) => {
-        if (err && !res.headersSent) {
+    res.attachment(`${certificate.certificateId}.pdf`);
+
+    const stream = bucket.openDownloadStreamByName(gridFileName);
+
+    stream.on("error", (err) => {
+        if (!res.headersSent) {
             next(err);
+        } else {
+            res.destroy();
         }
     });
+
+    stream.pipe(res);
 });

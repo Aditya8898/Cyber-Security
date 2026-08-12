@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit, Trash2, Database, BookOpen, AlertTriangle, FileText, CheckSquare, Upload, HelpCircle, Activity } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Database, BookOpen, AlertTriangle, FileText, CheckSquare, Upload, HelpCircle, Activity, Pin, MessageSquare } from 'lucide-react';
 import { api } from '../utils/api';
 
 export default function AdminPanel({ addToast }) {
@@ -13,6 +13,8 @@ export default function AdminPanel({ addToast }) {
   const [workshops, setWorkshops] = useState([]);
   const [modules, setModules] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
+  const [communityPosts, setCommunityPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
 
   // Selected targets for sub-management
   const [selectedWorkshopId, setSelectedWorkshopId] = useState('');
@@ -48,6 +50,63 @@ export default function AdminPanel({ addToast }) {
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  const fetchAllCommunityPosts = async () => {
+    setPostsLoading(true);
+    try {
+      const res = await api.get('/blogs');
+      if (res.success && res.data) {
+        setCommunityPosts(res.data);
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to load community posts", 'error');
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminTab === 'community') {
+      fetchAllCommunityPosts();
+    }
+  }, [adminTab]);
+
+  const handlePinPost = async (postId) => {
+    try {
+      const res = await api.patch(`/blogs/${postId}/pin`);
+      if (res.success) {
+        addToast("Post pinned successfully", "success");
+        fetchAllCommunityPosts();
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to pin post", "error");
+    }
+  };
+
+  const handleUnpinPost = async (postId) => {
+    try {
+      const res = await api.patch(`/blogs/${postId}/unpin`);
+      if (res.success) {
+        addToast("Post unpinned successfully", "success");
+        fetchAllCommunityPosts();
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to unpin post", "error");
+    }
+  };
+
+  const handleDeleteCommunityPost = async (postId) => {
+    if (!window.confirm("Are you sure you want to delete this community post? This will permanently remove it along with all likes and comments.")) return;
+    try {
+      const res = await api.delete(`/blogs/admin/${postId}`);
+      if (res.success) {
+        addToast("Community post deleted successfully", "success");
+        setCommunityPosts(prev => prev.filter(p => p._id !== postId));
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to delete post", "error");
+    }
+  };
 
   // Fetch collections depending on tab
   useEffect(() => {
@@ -320,6 +379,7 @@ export default function AdminPanel({ addToast }) {
           { key: 'workshops', lbl: 'Manage Workshops', icon: <BookOpen size={16} /> },
           { key: 'modules', lbl: 'Manage Syllabus', icon: <Database size={16} /> },
           { key: 'quizzes', lbl: 'Manage Quizzes', icon: <CheckSquare size={16} /> },
+          { key: 'community', lbl: 'Manage Community', icon: <MessageSquare size={16} /> },
         ].map(item => (
           <button 
             key={item.key}
@@ -379,9 +439,9 @@ export default function AdminPanel({ addToast }) {
                       <tbody>
                         {dashboardData.recentUsers?.map(u => (
                           <tr key={u._id}>
-                            <td>{u.name}</td>
-                            <td>{u.email}</td>
-                            <td><span className="tag" style={{ padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}>{u.role}</span></td>
+                            <td data-label="Name">{u.name}</td>
+                            <td data-label="Email">{u.email}</td>
+                            <td data-label="Role"><span className="tag" style={{ padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}>{u.role}</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -403,9 +463,9 @@ export default function AdminPanel({ addToast }) {
                       <tbody>
                         {dashboardData.recentEnrollments?.map(e => (
                           <tr key={e._id}>
-                            <td>{e.user?.name}</td>
-                            <td>{e.workshop?.title || 'Unknown'}</td>
-                            <td>{e.progress}%</td>
+                            <td data-label="User">{e.user?.name}</td>
+                            <td data-label="Workshop Path">{e.workshop?.title || 'Unknown'}</td>
+                            <td data-label="Progress">{e.progress}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -516,10 +576,10 @@ export default function AdminPanel({ addToast }) {
               <tbody>
                 {articles.map(art => (
                   <tr key={art._id}>
-                    <td>{art.title}</td>
-                    <td><span className="tag">{art.category}</span></td>
-                    <td>{art.author}</td>
-                    <td>
+                    <td data-label="Title">{art.title}</td>
+                    <td data-label="Category"><span className="tag">{art.category}</span></td>
+                    <td data-label="Author">{art.author}</td>
+                    <td data-label="Actions">
                       <div className="action-links">
                         <button className="btn btn-secondary" style={{ padding: '0.4rem' }} onClick={() => {
                           setEditId(art._id);
@@ -625,10 +685,10 @@ export default function AdminPanel({ addToast }) {
               <tbody>
                 {news.map(item => (
                   <tr key={item._id}>
-                    <td>{item.title}</td>
-                    <td>{item.source}</td>
-                    <td>{new Date(item.createdAt).toLocaleDateString()}</td>
-                    <td>
+                    <td data-label="Alert Title">{item.title}</td>
+                    <td data-label="Source Channel">{item.source}</td>
+                    <td data-label="Logged On">{new Date(item.createdAt).toLocaleDateString()}</td>
+                    <td data-label="Actions">
                       <div className="action-links">
                         <button className="btn btn-secondary" style={{ padding: '0.4rem' }} onClick={() => {
                           setEditId(item._id);
@@ -758,11 +818,11 @@ export default function AdminPanel({ addToast }) {
               <tbody>
                 {workshops.map(ws => (
                   <tr key={ws._id}>
-                    <td>{ws.title}</td>
-                    <td><span className="tag">{ws.level}</span></td>
-                    <td>{ws.duration}</td>
-                    <td>{ws.instructor}</td>
-                    <td>
+                    <td data-label="Workshop Title">{ws.title}</td>
+                    <td data-label="Level"><span className="tag">{ws.level}</span></td>
+                    <td data-label="Duration">{ws.duration}</td>
+                    <td data-label="Instructor">{ws.instructor}</td>
+                    <td data-label="Actions">
                       <div className="action-links">
                         <button className="btn btn-secondary" style={{ padding: '0.4rem' }} onClick={() => {
                           setEditId(ws._id);
@@ -896,11 +956,11 @@ export default function AdminPanel({ addToast }) {
               <tbody>
                 {modules.map(mod => (
                   <tr key={mod._id}>
-                    <td>{mod.order}</td>
-                    <td>{mod.title}</td>
-                    <td>{mod.description}</td>
-                    <td>{mod.pdfUrl ? "Yes (PDF)" : "No"}</td>
-                    <td>
+                    <td data-label="Order">{mod.order}</td>
+                    <td data-label="Lesson Title">{mod.title}</td>
+                    <td data-label="Objective">{mod.description}</td>
+                    <td data-label="Has Handout">{mod.pdfUrl ? "Yes (PDF)" : "No"}</td>
+                    <td data-label="Actions">
                       <div className="action-links">
                         <button className="btn btn-secondary" style={{ padding: '0.4rem' }} onClick={() => {
                           setEditId(mod._id);
@@ -1048,11 +1108,11 @@ export default function AdminPanel({ addToast }) {
               <tbody>
                 {quizzes.map(q => (
                   <tr key={q._id}>
-                    <td>{q.question}</td>
-                    <td>{q.options?.length} Slots</td>
-                    <td>Option {String.fromCharCode(65 + q.correctAnswer)}</td>
-                    <td>{q.marks || 1} Pts</td>
-                    <td>
+                    <td data-label="Question Content">{q.question}</td>
+                    <td data-label="Options count">{q.options?.length} Slots</td>
+                    <td data-label="Correct Index">Option {String.fromCharCode(65 + q.correctAnswer)}</td>
+                    <td data-label="Marks">{q.marks || 1} Pts</td>
+                    <td data-label="Actions">
                       <div className="action-links">
                         <button className="btn btn-secondary" style={{ padding: '0.4rem' }} onClick={() => {
                           setEditId(q._id);
@@ -1072,6 +1132,91 @@ export default function AdminPanel({ addToast }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Community Management Tab */}
+      {adminTab === 'community' && (
+        <div>
+          <div className="admin-section-header">
+            <h2>Community Post Moderation</h2>
+          </div>
+
+          {postsLoading ? (
+            <p style={{ color: 'var(--text-secondary)' }}>Loading community postings...</p>
+          ) : (
+            <div className="data-table-container glass-panel">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Post Title</th>
+                    <th>Author</th>
+                    <th>Mentioned Workshop</th>
+                    <th>Likes</th>
+                    <th>Comments</th>
+                    <th>Pinned</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {communityPosts.map(post => (
+                    <tr key={post._id}>
+                      <td data-label="Post Title">{post.title}</td>
+                      <td data-label="Author">{post.author?.name || 'Anonymous'}</td>
+                      <td data-label="Mentioned Workshop">
+                        {post.mentionedWorkshop ? (
+                          <span style={{ color: 'var(--accent-cyan)' }}>
+                            {post.mentionedWorkshop.title}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>None</span>
+                        )}
+                      </td>
+                      <td data-label="Likes">{post.likesCount || 0}</td>
+                      <td data-label="Comments">{post.commentsCount || 0}</td>
+                      <td data-label="Pinned">{post.isPinned ? "Yes" : "No"}</td>
+                      <td data-label="Actions">
+                        <div className="action-links">
+                          {post.isPinned ? (
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '0.4rem', color: 'var(--warning)' }} 
+                              onClick={() => handleUnpinPost(post._id)}
+                              title="Unpin Post"
+                            >
+                              <Pin size={14} fill="var(--warning)" />
+                            </button>
+                          ) : (
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '0.4rem' }} 
+                              onClick={() => handlePinPost(post._id)}
+                              title="Pin Post"
+                            >
+                              <Pin size={14} />
+                            </button>
+                          )}
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.4rem', color: 'var(--danger)' }} 
+                            onClick={() => handleDeleteCommunityPost(post._id)}
+                            title="Delete Post"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {communityPosts.length === 0 && (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No community posts have been published yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

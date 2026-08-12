@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, PlayCircle, FileText, CheckCircle, Lock, ChevronRight, ChevronLeft, Award, HelpCircle, ExternalLink } from 'lucide-react';
+import { BookOpen, PlayCircle, FileText, CheckCircle, Lock, ChevronRight, ChevronLeft, Award, HelpCircle, ExternalLink, MessageSquare } from 'lucide-react';
 import { api } from '../utils/api';
 
 export default function LearningPortal({ user, workshopId, setPage, addToast }) {
@@ -17,6 +17,11 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
   const [quizResult, setQuizResult] = useState(null);
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [generatedCertificate, setGeneratedCertificate] = useState(null);
+
+  // Community posts & responsive state
+  const [communityPosts, setCommunityPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Load workshop details, modules, and enrollment
   const loadPortalData = async () => {
@@ -72,6 +77,23 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
   useEffect(() => {
     if (workshopId) {
       loadPortalData();
+
+      // Fetch related community posts
+      const fetchWorkshopCommunityPosts = async () => {
+        setPostsLoading(true);
+        try {
+          const res = await api.get('/blogs');
+          if (res.success && res.data) {
+            const matching = res.data.filter(p => p.mentionedWorkshop?._id === workshopId);
+            setCommunityPosts(matching);
+          }
+        } catch (e) {
+          console.error("Failed to load community posts for workshop", e);
+        } finally {
+          setPostsLoading(false);
+        }
+      };
+      fetchWorkshopCommunityPosts();
     }
   }, [workshopId]);
 
@@ -181,8 +203,16 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
 
   return (
     <div className="learning-portal-layout">
+      {/* Mobile Syllabus Toggle Button */}
+      <button 
+        className="mobile-sidebar-toggle btn btn-secondary" 
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <BookOpen size={16} /> {sidebarOpen ? "Hide Syllabus" : "Show Syllabus"}
+      </button>
+
       {/* Sidebar Navigation */}
-      <aside className="glass-panel portal-sidebar">
+      <aside className={`glass-panel portal-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{workshop.title}</h2>
           <span className="tag">{workshop.level}</span>
@@ -214,6 +244,7 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
                   onClick={() => {
                     setActiveModuleIndex(idx);
                     setQuizMode(false);
+                    setSidebarOpen(false); // Close mobile drawer on syllabus click
                   }}
                 >
                   {isRead ? (
@@ -235,6 +266,7 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
                 onClick={() => {
                   if (isQuizUnlocked) {
                     setQuizMode(true);
+                    setSidebarOpen(false);
                   } else {
                     addToast("Complete all lessons to unlock the security test.", "warning");
                   }
@@ -411,7 +443,7 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
               )}
 
               {/* Reader Action Controls */}
-              <div className="reader-actions">
+              <div className="reader-actions" style={{ marginBottom: '2.5rem' }}>
                 <button 
                   className="btn btn-secondary" 
                   onClick={handlePrev}
@@ -438,6 +470,47 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
                   >
                     {quizQuestions.length > 0 ? "Unlock Security Assessment" : "Complete Workshop"} <ChevronRight size={16} />
                   </button>
+                )}
+              </div>
+
+              {/* Community posts section linking to workshop */}
+              <div className="workshop-community-section" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2.5rem' }}>
+                <h3 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MessageSquare size={20} style={{ color: 'var(--accent-cyan)' }} />
+                  Community Posts
+                </h3>
+                
+                {postsLoading ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading posts...</p>
+                ) : communityPosts.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    {communityPosts.map(post => (
+                      <div key={post._id} className="glass-panel" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.01)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                          <span>By {post.author?.name || 'Anonymous'}</span>
+                          <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <h4 style={{ fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>{post.title}</h4>
+                        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', lineHeight: '1.5' }}>
+                          {post.content}
+                        </p>
+                        <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          <span>{post.likesCount || 0} Likes</span>
+                          <span>{post.commentsCount || 0} Comments</span>
+                          <span 
+                            style={{ color: 'var(--accent-cyan)', cursor: 'pointer', marginLeft: 'auto', fontWeight: '600' }}
+                            onClick={() => setPage('community')}
+                          >
+                            View in Forum &rarr;
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                    No community posts mention this workshop yet.
+                  </div>
                 )}
               </div>
             </div>

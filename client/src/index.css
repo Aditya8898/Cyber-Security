@@ -928,32 +928,247 @@ a:hover {
   box-shadow: var(--glow-cyan);
 }
 
-/* Responsive Overrides */
-@media(max-width: 992px) {
-  .learning-portal-layout {
-    grid-template-columns: 1fr;
-  }
-  .article-reader-container {
-    grid-template-columns: 1fr;
-  }
-  .dashboard-grid {
-    grid-template-columns: 1fr;
+/* Community Specific Layouts */
+.community-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.workshop-dropdown-item {
+  transition: background 0.2s ease;
+}
+
+.workshop-dropdown-item:hover {
+  background: var(--bg-tertiary) !important;
+  color: var(--accent-cyan);
+}
+
+.skeleton-pulse {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 25%, rgba(255, 255, 255, 0.06) 50%, rgba(255, 255, 255, 0.02) 75%);
+  background-size: 200% 100%;
+  animation: loading-pulse 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes loading-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Responsive Hamburger Menu styles */
+.mobile-menu-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.5rem;
+  z-index: 101;
+}
+
+.user-nav-profile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.welcome-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Syllabus Sidebar drawer toggle */
+.mobile-sidebar-toggle {
+  display: none;
+}
+
+/* Media Queries for Viewports: 1024px and below */
+@media (max-width: 1024px) {
+  .hero-title {
+    font-size: 2.5rem;
   }
 }
 
-@media(max-width: 768px) {
-  .navbar {
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
+/* Media Queries for Viewports: 992px and below */
+@media (max-width: 992px) {
+  .learning-portal-layout {
+    grid-template-columns: 1fr;
   }
-  .nav-links {
-    flex-wrap: wrap;
+  
+  .article-reader-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Learning Sidebar Drawer Mode */
+  .mobile-sidebar-toggle {
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-bottom: 1.5rem;
+    z-index: 10;
   }
+
+  .portal-sidebar {
+    position: fixed;
+    top: 70px;
+    left: -320px;
+    width: 300px;
+    height: calc(100vh - 70px);
+    z-index: 999;
+    background: #080c14;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .portal-sidebar.open {
+    left: 0;
+  }
+}
+
+/* Media Queries for Viewports: 768px and below (Mobile / Tablet) */
+@media (max-width: 768px) {
+  /* Navbar Drawer Overrides */
+  .navbar {
+    padding: 1rem 1.5rem;
+  }
+
+  .mobile-menu-toggle {
+    display: block;
+  }
+
+  .nav-menu-wrapper {
+    position: fixed;
+    top: 70px;
+    left: -100%;
+    width: 100%;
+    height: calc(100vh - 70px);
+    background: rgba(8, 12, 20, 0.98);
+    backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 1.5rem;
+    gap: 2rem;
+    transition: left 0.3s ease;
+    z-index: 999;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .nav-menu-wrapper.open {
+    left: 0;
+  }
+
+  .nav-menu-wrapper .nav-links {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 1rem;
+  }
+
+  .nav-menu-wrapper .nav-item {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1.1rem;
+  }
+
+  .nav-menu-wrapper .auth-button-container {
+    width: 100%;
+    margin-top: auto;
+  }
+  
+  .user-nav-profile {
+    flex-direction: column;
+    width: 100%;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  /* Grid Conversions */
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Admin Dashboard tables to cards conversion */
+  .data-table-container {
+    border: none;
+  }
+
+  .data-table, .data-table thead, .data-table tbody, .data-table th, .data-table td, .data-table tr {
+    display: block;
+  }
+
+  .data-table thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .data-table tr {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.25rem;
+    padding: 1.25rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .data-table td {
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    padding-left: 45% !important;
+    text-align: right;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .data-table td:last-child {
+    border-bottom: none;
+  }
+
+  .data-table td:before {
+    position: absolute;
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+    width: 40%;
+    text-align: left;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    content: attr(data-label);
+  }
+
+  .data-table td .action-links {
+    justify-content: flex-end;
+  }
+
+  /* Quiz layout touch friendly targets */
+  .quiz-option-item {
+    padding: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .quiz-option-number {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+
+  /* General elements */
   .hero-title {
     font-size: 2.25rem;
   }
+
   .hero-cta {
     flex-direction: column;
     align-items: stretch;
@@ -961,7 +1176,63 @@ a:hover {
     max-width: 320px;
     margin: 0 auto;
   }
-  .grid-cols-2 {
-    grid-template-columns: 1fr;
+
+  /* Community full width posts */
+  .community-container {
+    padding: 0;
   }
+}
+
+/* Small mobile devices: 360px - 414px */
+@media (max-width: 414px) {
+  body {
+    font-size: 14px;
+  }
+  
+  .hero-title {
+    font-size: 1.85rem;
+  }
+
+  h1 { font-size: 1.85rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.2rem; }
+
+  .content-wrapper {
+    padding: 1.5rem 1rem;
+  }
+
+  /* Article reading view */
+  .reader-main {
+    padding: 1.5rem 1rem !important;
+  }
+
+  .article-cover {
+    max-height: 220px;
+  }
+
+  .article-header h1 {
+    font-size: 1.6rem;
+  }
+
+  /* Certificate page adjustments */
+  .certificate-section-box {
+    padding: 1rem;
+  }
+
+  /* Forms adjustments */
+  .form-control {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.9rem;
+  }
+  
+  .btn {
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* Universal Image Overflow prevention */
+img {
+  max-width: 100%;
+  height: auto;
 }

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Award, Settings, User, Key, Trash2, Shield, Calendar, Play } from 'lucide-react';
+import { BookOpen, Award, Settings, User, Key, Trash2, Shield, Calendar, Play, MessageSquare } from 'lucide-react';
 import { api } from '../utils/api';
 
 export default function Dashboard({ user, setUser, setPage, setSelectedWorkshopId, addToast }) {
   const [activeTab, setActiveTab] = useState('enrollments');
   const [enrollments, setEnrollments] = useState([]);
   const [certificates, setCertificates] = useState([]);
+  const [myPosts, setMyPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
 
   // Profile forms
   const [name, setName] = useState(user?.name || '');
@@ -29,6 +31,39 @@ export default function Dashboard({ user, setUser, setPage, setSelectedWorkshopI
       }
     } catch (err) {
       addToast(err.message || "Failed to load dashboard records", 'error');
+    }
+  };
+
+  const loadMyPosts = async () => {
+    setPostsLoading(true);
+    try {
+      const res = await api.get('/blogs/user/my-posts');
+      if (res.success && res.data) {
+        setMyPosts(res.data);
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to load community posts", 'error');
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && activeTab === 'community') {
+      loadMyPosts();
+    }
+  }, [activeTab, user]);
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Are you sure you want to delete this community post? This action is permanent and will delete all comments and likes associated with it.")) return;
+    try {
+      const res = await api.delete(`/blogs/${postId}`);
+      if (res.success) {
+        addToast("Post deleted successfully", "success");
+        setMyPosts(prev => prev.filter(p => p._id !== postId));
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to delete post", "error");
     }
   };
 
@@ -134,6 +169,12 @@ export default function Dashboard({ user, setUser, setPage, setSelectedWorkshopI
               <Award size={18} /> Claimed Certificates
             </button>
             <button 
+              className={`tab-btn ${activeTab === 'community' ? 'active' : ''}`}
+              onClick={() => setActiveTab('community')}
+            >
+              <MessageSquare size={18} /> My Community Posts
+            </button>
+            <button 
               className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
               onClick={() => setActiveTab('settings')}
             >
@@ -232,6 +273,58 @@ export default function Dashboard({ user, setUser, setPage, setSelectedWorkshopI
               ) : (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                   You have not unlocked any certificates yet. Complete all lessons of a workshop and score 60%+ on the final assessment to claim.
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'community' && (
+            <div>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>My Community Posts</h2>
+              {postsLoading ? (
+                <p style={{ color: 'var(--text-muted)' }}>Loading posts...</p>
+              ) : myPosts.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {myPosts.map(post => (
+                    <div key={post._id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
+                      <div style={{ flex: 1, minWidth: '240px' }}>
+                        <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>{post.title}</h3>
+                        <div style={{ display: 'flex', gap: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', flexWrap: 'wrap' }}>
+                          <span>Published: {new Date(post.createdAt).toLocaleDateString()}</span>
+                          <span>Likes: {post.likesCount || 0}</span>
+                          <span>Comments: {post.commentsCount || 0}</span>
+                          {post.mentionedWorkshop && (
+                            <span style={{ color: 'var(--accent-cyan)' }}>
+                              Workshop: {post.mentionedWorkshop.title}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button 
+                          className="btn btn-secondary"
+                          onClick={() => setPage('community')}
+                        >
+                          View Feed
+                        </button>
+                        <button 
+                          className="btn btn-danger"
+                          style={{ padding: '0.5rem' }}
+                          onClick={() => handleDeletePost(post._id)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                  You have not created any awareness posts yet.
+                  <button className="btn btn-primary" style={{ marginTop: '1.5rem', display: 'block', margin: '1.5rem auto 0 auto' }} onClick={() => setPage('community')}>
+                    Go to Awareness Forum
+                  </button>
                 </div>
               )}
             </div>

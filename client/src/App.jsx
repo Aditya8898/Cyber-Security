@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, User, LogOut, Lock, Mail, FileText, CheckCircle, Info, X } from 'lucide-react';
+import { Shield, User, LogOut, Lock, Mail, FileText, CheckCircle, Info, X, Menu } from 'lucide-react';
 import { api, getAuthToken, setAuthToken } from './utils/api';
 
 // Pages
@@ -10,11 +10,13 @@ import Workshops from './pages/Workshops';
 import LearningPortal from './pages/LearningPortal';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
+import Community from './pages/Community';
 
 export default function App() {
   const [page, setPage] = useState('landing');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Detail view parameters
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
@@ -204,6 +206,16 @@ export default function App() {
         );
       case 'admin':
         return <AdminPanel addToast={addToast} />;
+      case 'community':
+        return (
+          <Community 
+            user={user} 
+            setPage={setPage} 
+            setSelectedWorkshopId={setSelectedWorkshopId} 
+            addToast={addToast} 
+            setLoginModalOpen={setAuthModalOpen}
+          />
+        );
       default:
         return <LandingPage setPage={setPage} setSelectedWorkshopId={setSelectedWorkshopId} addToast={addToast} />;
     }
@@ -236,37 +248,45 @@ export default function App() {
           <Shield size={26} /> CyberGuard
         </div>
 
-        <nav>
+        <button 
+          className="mobile-menu-toggle"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+
+        <nav className={`nav-menu-wrapper ${mobileMenuOpen ? 'open' : ''}`}>
           <ul className="nav-links">
-            <li className={`nav-item ${page === 'landing' ? 'active' : ''}`} onClick={() => navigateToPage('landing')}>Home</li>
-            <li className={`nav-item ${page === 'articles' ? 'active' : ''}`} onClick={() => navigateToPage('articles')}>Guides</li>
-            <li className={`nav-item ${page === 'news' ? 'active' : ''}`} onClick={() => navigateToPage('news')}>Scam alerts</li>
-            <li className={`nav-item ${page === 'workshops' ? 'active' : ''}`} onClick={() => navigateToPage('workshops')}>Workshops</li>
+            <li className={`nav-item ${page === 'landing' ? 'active' : ''}`} onClick={() => { navigateToPage('landing'); setMobileMenuOpen(false); }}>Home</li>
+            <li className={`nav-item ${page === 'articles' ? 'active' : ''}`} onClick={() => { navigateToPage('articles'); setMobileMenuOpen(false); }}>Guides</li>
+            <li className={`nav-item ${page === 'news' ? 'active' : ''}`} onClick={() => { navigateToPage('news'); setMobileMenuOpen(false); }}>Scam alerts</li>
+            <li className={`nav-item ${page === 'workshops' ? 'active' : ''}`} onClick={() => { navigateToPage('workshops'); setMobileMenuOpen(false); }}>Workshops</li>
+            <li className={`nav-item ${page === 'community' ? 'active' : ''}`} onClick={() => { navigateToPage('community'); setMobileMenuOpen(false); }}>Community</li>
             
             {user && (
-              <li className={`nav-item ${page === 'dashboard' ? 'active' : ''}`} onClick={() => navigateToPage('dashboard')}>Dashboard</li>
+              <li className={`nav-item ${page === 'dashboard' ? 'active' : ''}`} onClick={() => { navigateToPage('dashboard'); setMobileMenuOpen(false); }}>Dashboard</li>
             )}
 
             {user?.role === 'admin' && (
-              <li className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={() => navigateToPage('admin')}>Admin Control</li>
+              <li className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={() => { navigateToPage('admin'); setMobileMenuOpen(false); }}>Admin Control</li>
             )}
           </ul>
-        </nav>
 
-        <div className="auth-button-container">
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Welcome, {user.name}</span>
-              <button className="btn btn-secondary" onClick={handleLogout}>
-                <LogOut size={16} /> Logout
+          <div className="auth-button-container">
+            {user ? (
+              <div className="user-nav-profile">
+                <span className="welcome-text">Welcome, {user.name}</span>
+                <button className="btn btn-secondary logout-btn" onClick={() => { handleLogout(); setMobileMenuOpen(false); }}>
+                  <LogOut size={16} /> Logout
+                </button>
+              </div>
+            ) : (
+              <button className="btn btn-primary signin-btn" onClick={() => { setIsRegisterMode(false); setAuthModalOpen(true); setMobileMenuOpen(false); }}>
+                Sign In
               </button>
-            </div>
-          ) : (
-            <button className="btn btn-primary" onClick={() => { setIsRegisterMode(false); setAuthModalOpen(true); }}>
-              Sign In
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        </nav>
       </header>
 
       {/* Main Pages */}
