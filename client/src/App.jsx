@@ -378,9 +378,9 @@ export default function App() {
 
               <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.88rem' }}>
                 {isRegisterMode ? (
-                  <p>Already have an account? <span style={{ color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '500' }} onClick={() => setIsRegisterMode(false)}>Sign In</span></p>
+                  <p>Already have an account? <button type="button" style={{ background: 'none', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '500', padding: 0, font: 'inherit' }} onClick={() => setIsRegisterMode(false)}>Sign In</button></p>
                 ) : (
-                  <p>Need access? <span style={{ color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '500' }} onClick={() => setIsRegisterMode(true)}>Register here</span></p>
+                  <p>Need access? <button type="button" style={{ background: 'none', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '500', padding: 0, font: 'inherit' }} onClick={() => setIsRegisterMode(true)}>Register here</button></p>
                 )}
               </div>
             </form>

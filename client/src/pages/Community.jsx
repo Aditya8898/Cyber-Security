@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Heart, MessageSquare, Trash2, Pin, Search, Image, X, BookOpen, Send, Calendar, Plus } from 'lucide-react';
+import { Shield, Heart, MessageSquare, Trash2, Pin, Search, Image, X, BookOpen, Send, Calendar, Plus, ArrowLeft } from 'lucide-react';
 import { api } from '../utils/api';
 
 export default function Community({ user, setPage, setSelectedWorkshopId, addToast, setLoginModalOpen }) {
@@ -18,6 +18,7 @@ export default function Community({ user, setPage, setSelectedWorkshopId, addToa
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [publishing, setPublishing] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
 
   // Comments states (keyed by postId)
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
@@ -61,6 +62,13 @@ export default function Community({ user, setPage, setSelectedWorkshopId, addToa
   useEffect(() => {
     localStorage.setItem('cyber_user_likes', JSON.stringify(userLikedPosts));
   }, [userLikedPosts]);
+
+  // Auto-fetch comments when a post is selected in detail view
+  useEffect(() => {
+    if (selectedPost) {
+      loadCommentsForDetail(selectedPost._id);
+    }
+  }, [selectedPost]);
 
   // Handle Like/Unlike
   const handleLike = async (postId) => {
@@ -188,6 +196,137 @@ export default function Community({ user, setPage, setSelectedWorkshopId, addToa
     }
   };
 
+  // Comments loading helper for Detail view
+  const loadCommentsForDetail = async (postId) => {
+    setActiveCommentsPostId(postId);
+    setCommentsLoading(prev => ({ ...prev, [postId]: true }));
+    try {
+      const res = await api.get(`/comments/post/${postId}`);
+      if (res.success && res.data) {
+        setCommentsMap(prev => ({ ...prev, [postId]: res.data }));
+      }
+    } catch (err) {
+      addToast('Failed to load comments', 'error');
+    } finally {
+      setCommentsLoading(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  // Add Comment in Detail View
+  const handleAddCommentInDetail = async (postId) => {
+    if (!user) {
+      addToast('Please login to comment.', 'warning');
+      setLoginModalOpen(true);
+      return;
+    }
+
+    const text = newCommentText[postId]?.trim();
+    if (!text) return;
+
+    try {
+      const res = await api.post(`/comments/post/${postId}`, { content: text });
+      if (res.success && res.data) {
+        setCommentsMap(prev => ({
+          ...prev,
+          [postId]: [res.data, ...(prev[postId] || [])]
+        }));
+        setNewCommentText(prev => ({ ...prev, [postId]: '' }));
+        
+        // Update comments count in posts list
+        setPosts(prev => prev.map(post => {
+          if (post._id === postId) {
+            return { ...post, commentsCount: (post.commentsCount || 0) + 1 };
+          }
+          return post;
+        }));
+
+        setSelectedPost(prev => {
+          if (prev && prev._id === postId) {
+            return { ...prev, commentsCount: (prev.commentsCount || 0) + 1 };
+          }
+          return prev;
+        });
+
+        addToast('Comment added!', 'success');
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to add comment', 'error');
+    }
+  };
+
+  // Delete Comment in Detail View
+  const handleDeleteCommentInDetail = async (postId, commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const res = await api.delete(`/comments/${commentId}`);
+      if (res.success) {
+        setCommentsMap(prev => ({
+          ...prev,
+          [postId]: (prev[postId] || []).filter(c => c._id !== commentId)
+        }));
+        setPosts(prev => prev.map(post => {
+          if (post._id === postId) {
+            return { ...post, commentsCount: Math.max(0, (post.commentsCount || 1) - 1) };
+          }
+          return post;
+        }));
+
+        setSelectedPost(prev => {
+          if (prev && prev._id === postId) {
+            return { ...prev, commentsCount: Math.max(0, (prev.commentsCount || 1) - 1) };
+          }
+          return prev;
+        });
+
+        addToast('Comment deleted', 'success');
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to delete comment', 'error');
+    }
+  };
+
+  // Like Post in Detail View
+  const handleLikeInDetail = async (postId) => {
+    if (!user) {
+      addToast('Please login to like posts.', 'warning');
+      setLoginModalOpen(true);
+      return;
+    }
+
+    try {
+      const res = await api.post(`/blogs/${postId}/like`);
+      if (res.success) {
+        setPosts(prev => prev.map(post => {
+          if (post._id === postId) {
+            return {
+              ...post,
+              likesCount: res.likesCount
+            };
+          }
+          return post;
+        }));
+
+        setSelectedPost(prev => {
+          if (prev && prev._id === postId) {
+            return {
+              ...prev,
+              likesCount: res.likesCount
+            };
+          }
+          return prev;
+        });
+
+        setUserLikedPosts(prev => ({
+          ...prev,
+          [postId]: res.liked
+        }));
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to like post', 'error');
+    }
+  };
+
   // Image Selection Handler
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -260,370 +399,485 @@ export default function Community({ user, setPage, setSelectedWorkshopId, addToa
 
   return (
     <div className="community-container">
-      <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Shield size={36} style={{ color: 'var(--accent-cyan)' }} />
-            Cyber Guard Awareness Forum
-          </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Share threat warnings, report scam behaviors, discuss best digital defense practices, and link lessons.
-          </p>
-        </div>
-        
-        <div>
-          {user ? (
-            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
-              <Plus size={16} /> Create Awareness Post
-            </button>
-          ) : (
-            <button className="btn btn-secondary" onClick={() => { addToast('Please login to create a community post', 'warning'); setLoginModalOpen(true); }}>
-              Sign In to Post
-            </button>
-          )}
-        </div>
-      </div>
+      {selectedPost ? (
+        <div className="community-post-detail" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <button 
+            className="btn btn-secondary" 
+            style={{ marginBottom: '1rem', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem' }} 
+            onClick={() => {
+              setSelectedPost(null);
+              loadData();
+            }}
+          >
+            <ArrowLeft size={16} /> Back to Forum
+          </button>
 
-      {/* Local Search Feed */}
-      <div className="search-bar-container" style={{ marginBottom: '2rem' }}>
-        <div className="search-input-wrapper">
-          <Search size={18} className="search-icon" />
-          <input 
-            type="text" 
-            className="form-control" 
-            placeholder="Search community posts, tags, fraud patterns..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
+          <article className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: selectedPost.isPinned ? '4px solid var(--accent-cyan)' : '1px solid var(--border-color)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '40px', height: '40px', background: 'var(--bg-tertiary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--accent-cyan)' }}>
+                    {selectedPost.author?.name?.charAt(0).toUpperCase() || 'U'}
+                  </span>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{selectedPost.author?.name || 'Anonymous User'}</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Published {new Date(selectedPost.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
 
-      {/* Post Creator Modal Drawer */}
-      {showCreateForm && (
-        <div className="modal-backdrop" onClick={() => setShowCreateForm(false)}>
-          <div className="modal-content glass-panel" style={{ maxWidth: '650px' }} onClick={(e) => e.stopPropagation()}>
-            <button 
-              className="btn btn-secondary btn-icon" 
-              style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none' }}
-              onClick={() => setShowCreateForm(false)}
-            >
-              <X size={18} />
-            </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {selectedPost.isPinned && (
+                  <span className="tag" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', borderColor: 'rgba(0, 229, 255, 0.4)', color: 'var(--accent-cyan)', background: 'rgba(0, 229, 255, 0.1)' }}>
+                    Pin
+                  </span>
+                )}
+                {user && selectedPost.author?._id === user._id && (
+                  <button 
+                    className="btn btn-secondary btn-icon" 
+                    style={{ border: 'none', background: 'transparent', color: 'var(--danger)' }}
+                    onClick={async () => {
+                      await handleDeletePost(selectedPost._id);
+                      setSelectedPost(null);
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-            <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem' }}>Publish Awareness Post</h2>
+            {/* Content */}
+            <div>
+              <h3 style={{ fontSize: '1.6rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>{selectedPost.title}</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', whiteSpace: 'pre-wrap', lineHeight: '1.7' }}>
+                {selectedPost.content}
+              </p>
+            </div>
 
-            <form onSubmit={handleCreatePostSubmit}>
-              <div className="form-group">
-                <label className="form-label">Post Title</label>
+            {/* Image */}
+            {selectedPost.image && (
+              <div style={{ width: '100%', maxHeight: '500px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                <img 
+                  src={selectedPost.image.startsWith('http') ? selectedPost.image : `${window.location.origin}${selectedPost.image}`} 
+                  alt="Post attachment" 
+                  style={{ width: '100%', maxHeight: '500px', objectFit: 'contain' }}
+                />
+              </div>
+            )}
+
+            {/* Workshop Mentions Badge */}
+            {selectedPost.mentionedWorkshop && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <span 
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontWeight: '600', cursor: 'pointer', background: 'rgba(0,229,255,0.07)', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.85rem' }}
+                  onClick={() => {
+                    setSelectedWorkshopId(selectedPost.mentionedWorkshop._id);
+                    setPage('learning-portal');
+                  }}
+                >
+                  <BookOpen size={14} /> @ {selectedPost.mentionedWorkshop.title}
+                </span>
+              </div>
+            )}
+
+            {/* Actions Footer */}
+            <div style={{ display: 'flex', gap: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ background: 'transparent', border: 'none', color: !!userLikedPosts[selectedPost._id] ? 'var(--accent-cyan)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}
+                onClick={() => handleLikeInDetail(selectedPost._id)}
+              >
+                <Heart size={18} fill={!!userLikedPosts[selectedPost._id] ? 'var(--accent-cyan)' : 'transparent'} /> {selectedPost.likesCount || 0} Likes
+              </button>
+
+              <span 
+                style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}
+              >
+                <MessageSquare size={18} /> {selectedPost.commentsCount || 0} Comments
+              </span>
+            </div>
+
+            {/* Comments section */}
+            <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.2)', border: 'none', marginTop: '1rem', borderRadius: 'var(--radius-sm)' }}>
+              <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Comments</h4>
+
+              {/* Add Comment Input Form */}
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
                 <input 
                   type="text" 
                   className="form-control" 
-                  placeholder="Summarize the threat warning or topic..."
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required 
+                  style={{ flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.9rem' }}
+                  placeholder="Write a constructive security comment..."
+                  value={newCommentText[selectedPost._id] || ''}
+                  onChange={(e) => setNewCommentText(prev => ({ ...prev, [selectedPost._id]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddCommentInDetail(selectedPost._id);
+                  }}
                 />
+                <button 
+                  className="btn btn-primary" 
+                  style={{ padding: '0.5rem 1rem' }}
+                  onClick={() => handleAddCommentInDetail(selectedPost._id)}
+                >
+                  <Send size={14} /> Send
+                </button>
               </div>
 
-              {/* Mentions Workshop Input */}
-              <div className="form-group" style={{ position: 'relative' }}>
-                <label className="form-label">Mention Workshop (Syllabus Link)</label>
-                
-                {selectedWorkshop ? (
-                  <div className="glass-panel" style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: 'var(--accent-cyan)' }}>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--accent-cyan)', fontWeight: '500' }}>
-                      @{selectedWorkshop.title}
-                    </span>
-                    <button type="button" className="btn btn-secondary btn-icon" style={{ background: 'transparent', border: 'none' }} onClick={() => setSelectedWorkshop(null)}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <div>
+              {/* Comments List */}
+              {commentsLoading[selectedPost._id] ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading comments...</p>
+              ) : commentsMap[selectedPost._id]?.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {commentsMap[selectedPost._id].map(comment => {
+                    const isCommentAuthor = user && comment.author?._id === user._id;
+                    return (
+                      <div key={comment._id} className="glass-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                              {comment.author?.name || 'Anonymous User'}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {new Date(comment.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {isCommentAuthor && (
+                            <button 
+                              className="btn btn-secondary btn-icon" 
+                              style={{ border: 'none', background: 'transparent', color: 'var(--danger)', padding: '0.1rem' }}
+                              onClick={() => handleDeleteCommentInDetail(selectedPost._id, comment._id)}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+                          {comment.content}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  No comments yet. Start the discussion!
+                </p>
+              )}
+            </div>
+          </article>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem' }}>
+            <div>
+              <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Shield size={36} style={{ color: 'var(--accent-cyan)' }} />
+                Cyber Guard Awareness Forum
+              </h1>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Share threat warnings, report scam behaviors, discuss best digital defense practices, and link lessons.
+              </p>
+            </div>
+            
+            <div>
+              {user ? (
+                <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+                  <Plus size={16} /> Create Awareness Post
+                </button>
+              ) : (
+                <button className="btn btn-secondary" onClick={() => { addToast('Please login to create a community post', 'warning'); setLoginModalOpen(true); }}>
+                  Sign In to Post
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Local Search Feed */}
+          <div className="search-bar-container" style={{ marginBottom: '2rem' }}>
+            <div className="search-input-wrapper">
+              <Search size={18} className="search-icon" />
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Search community posts, tags, fraud patterns..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Post Creator Modal Drawer */}
+          {showCreateForm && (
+            <div className="modal-backdrop" onClick={() => setShowCreateForm(false)}>
+              <div className="modal-content glass-panel large" onClick={(e) => e.stopPropagation()}>
+                <button 
+                  className="btn btn-secondary btn-icon" 
+                  style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none' }}
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  <X size={18} />
+                </button>
+
+                <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem' }}>Publish Awareness Post</h2>
+
+                <form onSubmit={handleCreatePostSubmit}>
+                  <div className="form-group">
+                    <label className="form-label">Post Title</label>
                     <input 
                       type="text" 
                       className="form-control" 
-                      placeholder="Search and select a workshop path..."
-                      value={workshopSearch}
-                      onChange={(e) => {
-                        setWorkshopSearch(e.target.value);
-                        setShowWorkshopDropdown(true);
-                      }}
-                      onFocus={() => setShowWorkshopDropdown(true)}
+                      placeholder="Summarize the threat warning or topic..."
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required 
                     />
-                    {showWorkshopDropdown && (
-                      <div className="glass-panel" style={{ position: 'absolute', width: '100%', zIndex: 10, maxHeight: '200px', overflowY: 'auto', marginTop: '0.25rem', background: 'var(--bg-secondary)' }}>
-                        {filteredWorkshops.map(ws => (
-                          <div 
-                            key={ws._id} 
-                            style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }}
-                            className="workshop-dropdown-item"
-                            onClick={() => {
-                              setSelectedWorkshop(ws);
-                              setShowWorkshopDropdown(false);
-                            }}
-                          >
-                            {ws.title}
-                          </div>
-                        ))}
-                        {filteredWorkshops.length === 0 && (
-                          <div style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                            No workshops matching selection.
+                  </div>
+
+                  {/* Mentions Workshop Input */}
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label className="form-label">Mention Workshop (Syllabus Link)</label>
+                    
+                    {selectedWorkshop ? (
+                      <div className="glass-panel" style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: 'var(--accent-cyan)' }}>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--accent-cyan)', fontWeight: '500' }}>
+                          @{selectedWorkshop.title}
+                        </span>
+                        <button type="button" className="btn btn-secondary btn-icon" style={{ background: 'transparent', border: 'none' }} onClick={() => setSelectedWorkshop(null)}>
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          placeholder="Search and select a workshop path..."
+                          value={workshopSearch}
+                          onChange={(e) => {
+                            setWorkshopSearch(e.target.value);
+                            setShowWorkshopDropdown(true);
+                          }}
+                          onFocus={() => setShowWorkshopDropdown(true)}
+                        />
+                        {showWorkshopDropdown && (
+                          <div className="glass-panel" style={{ position: 'absolute', width: '100%', zIndex: 10, maxHeight: '200px', overflowY: 'auto', marginTop: '0.25rem', background: 'var(--bg-secondary)' }}>
+                            {filteredWorkshops.map(ws => (
+                              <div 
+                                key={ws._id} 
+                                style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }}
+                                className="workshop-dropdown-item"
+                                onClick={() => {
+                                  setSelectedWorkshop(ws);
+                                  setShowWorkshopDropdown(false);
+                                }}
+                              >
+                                {ws.title}
+                              </div>
+                            ))}
+                            {filteredWorkshops.length === 0 && (
+                              <div style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                No workshops matching selection.
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              <div className="form-group">
-                <label className="form-label">Body Content (Markdown Supported)</label>
-                <textarea 
-                  rows="6" 
-                  className="form-control" 
-                  placeholder="Provide detailed logs, warning descriptions, links involved, or prevention techniques..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  required 
-                />
-              </div>
-
-              {/* Photo Upload with Preview */}
-              <div className="form-group">
-                <label className="form-label">Attach Awareness Photo</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    style={{ alignSelf: 'flex-start', display: 'flex', gap: '0.5rem' }}
-                    onClick={() => fileInputRef.current.click()}
-                  >
-                    <Image size={16} /> Choose Image
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    style={{ display: 'none' }} 
-                    accept="image/*"
-                    onChange={handleImageChange}
-                  />
-
-                  {imagePreview && (
-                    <div style={{ position: 'relative', width: '100%', maxHeight: '220px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        style={{ width: '100%', height: '220px', objectFit: 'cover' }}
-                      />
-                      <button 
-                        type="button" 
-                        className="btn btn-danger btn-icon" 
-                        style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', borderRadius: '50%', padding: '0.4rem' }}
-                        onClick={() => {
-                          setImageFile(null);
-                          setImagePreview('');
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ width: '100%', marginTop: '1.5rem' }} 
-                disabled={publishing}
-              >
-                {publishing ? 'Publishing Post...' : 'Publish Post to Feed'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Community Feed List */}
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {[1, 2, 3].map(n => (
-            <div key={n} className="glass-panel card skeleton-pulse" style={{ height: '200px', display: 'flex', background: 'rgba(255,255,255,0.01)' }}></div>
-          ))}
-        </div>
-      ) : filteredPosts.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {filteredPosts.map(post => {
-            const hasLiked = !!userLikedPosts[post._id];
-            const isAuthor = user && post.author?._id === user._id;
-
-            return (
-              <article key={post._id} className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: post.isPinned ? '4px solid var(--accent-cyan)' : '1px solid var(--border-color)' }}>
-                {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '40px', height: '40px', background: 'var(--bg-tertiary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--accent-cyan)' }}>
-                        {post.author?.name?.charAt(0).toUpperCase() || 'U'}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{post.author?.name || 'Anonymous User'}</h4>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Published {new Date(post.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {post.isPinned && (
-                      <span className="tag" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', borderColor: 'rgba(0, 229, 255, 0.4)', color: 'var(--accent-cyan)', background: 'rgba(0, 229, 255, 0.1)' }}>
-                        Pin
-                      </span>
-                    )}
-                    {isAuthor && (
-                      <button 
-                        className="btn btn-secondary btn-icon" 
-                        style={{ border: 'none', background: 'transparent', color: 'var(--danger)' }}
-                        onClick={() => handleDeletePost(post._id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div>
-                  <h3 style={{ fontSize: '1.4rem', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>{post.title}</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-                    {post.content}
-                  </p>
-                </div>
-
-                {/* Image */}
-                {post.image && (
-                  <div style={{ width: '100%', maxHeight: '420px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
-                    <img 
-                      src={post.image.startsWith('http') ? post.image : `${window.location.origin}${post.image}`} 
-                      alt="Post attachment" 
-                      style={{ width: '100%', maxHeight: '420px', objectFit: 'cover' }}
+                  <div className="form-group">
+                    <label className="form-label">Body Content (Markdown Supported)</label>
+                    <textarea 
+                      rows="6" 
+                      className="form-control" 
+                      placeholder="Provide detailed logs, warning descriptions, links involved, or prevention techniques..."
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      required 
                     />
                   </div>
-                )}
 
-                {/* Workshop Mentions Badge */}
-                {post.mentionedWorkshop && (
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <span 
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontWeight: '600', cursor: 'pointer', background: 'rgba(0,229,255,0.07)', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.85rem' }}
-                      onClick={() => {
-                        setSelectedWorkshopId(post.mentionedWorkshop._id);
-                        setPage('learning-portal');
-                      }}
-                    >
-                      <BookOpen size={14} /> @ {post.mentionedWorkshop.title}
-                    </span>
-                  </div>
-                )}
-
-                {/* Actions Footer */}
-                <div style={{ display: 'flex', gap: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ background: 'transparent', border: 'none', color: hasLiked ? 'var(--accent-cyan)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}
-                    onClick={() => handleLike(post._id)}
-                  >
-                    <Heart size={18} fill={hasLiked ? 'var(--accent-cyan)' : 'transparent'} /> {post.likesCount || 0} Likes
-                  </button>
-
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ background: 'transparent', border: 'none', color: activeCommentsPostId === post._id ? 'var(--accent-cyan)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}
-                    onClick={() => handleToggleComments(post._id)}
-                  >
-                    <MessageSquare size={18} /> {post.commentsCount || 0} Comments
-                  </button>
-                </div>
-
-                {/* Collapsible Comments section */}
-                {activeCommentsPostId === post._id && (
-                  <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.2)', border: 'none', marginTop: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                    <h4 style={{ fontSize: '1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Comments</h4>
-
-                    {/* Add Comment Input Form */}
-                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        style={{ flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.9rem' }}
-                        placeholder="Write a constructive security comment..."
-                        value={newCommentText[post._id] || ''}
-                        onChange={(e) => setNewCommentText(prev => ({ ...prev, [post._id]: e.target.value }))}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleAddComment(post._id);
-                        }}
-                      />
+                  {/* Photo Upload with Preview */}
+                  <div className="form-group">
+                    <label className="form-label">Attach Awareness Photo</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <button 
-                        className="btn btn-primary" 
-                        style={{ padding: '0.5rem 1rem' }}
-                        onClick={() => handleAddComment(post._id)}
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ alignSelf: 'flex-start', display: 'flex', gap: '0.5rem' }}
+                        onClick={() => fileInputRef.current.click()}
                       >
-                        <Send size={14} /> Send
+                        <Image size={16} /> Choose Image
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        accept="image/*"
+                        onChange={handleImageChange}
+                      />
+
+                      {imagePreview && (
+                        <div style={{ position: 'relative', width: '100%', maxHeight: '220px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                          <img 
+                            src={imagePreview} 
+                            alt="Preview" 
+                            style={{ width: '100%', height: '220px', objectFit: 'cover' }}
+                          />
+                          <button 
+                            type="button" 
+                            className="btn btn-danger btn-icon" 
+                            style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', borderRadius: '50%', padding: '0.4rem' }}
+                            onClick={() => {
+                              setImageFile(null);
+                              setImagePreview('');
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    style={{ width: '100%', marginTop: '1.5rem' }} 
+                    disabled={publishing}
+                  >
+                    {publishing ? 'Publishing Post...' : 'Publish Post to Feed'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Community Feed List */}
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {[1, 2, 3].map(n => (
+                <div key={n} className="glass-panel card skeleton-pulse" style={{ height: '200px', display: 'flex', background: 'rgba(255,255,255,0.01)' }}></div>
+              ))}
+            </div>
+          ) : filteredPosts.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {filteredPosts.map(post => {
+                const hasLiked = !!userLikedPosts[post._id];
+                const isAuthor = user && post.author?._id === user._id;
+                const shortPreview = post.content.length > 200 
+                  ? post.content.slice(0, 200) + '...' 
+                  : post.content;
+
+                return (
+                  <article key={post._id} className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: post.isPinned ? '4px solid var(--accent-cyan)' : '1px solid var(--border-color)' }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '40px', height: '40px', background: 'var(--bg-tertiary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--accent-cyan)' }}>
+                            {post.author?.name?.charAt(0).toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{post.author?.name || 'Anonymous User'}</h4>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Published {new Date(post.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {post.isPinned && (
+                          <span className="tag" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', borderColor: 'rgba(0, 229, 255, 0.4)', color: 'var(--accent-cyan)', background: 'rgba(0, 229, 255, 0.1)' }}>
+                            Pin
+                          </span>
+                        )}
+                        {isAuthor && (
+                          <button 
+                            className="btn btn-secondary btn-icon" 
+                            style={{ border: 'none', background: 'transparent', color: 'var(--danger)' }}
+                            onClick={() => handleDeletePost(post._id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h3 style={{ fontSize: '1.4rem', color: 'var(--text-primary)' }}>{post.title}</h3>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                        {shortPreview}
+                      </p>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', alignSelf: 'flex-start', marginTop: '0.5rem' }}
+                        onClick={() => setSelectedPost(post)}
+                      >
+                        Read More &rarr;
                       </button>
                     </div>
 
-                    {/* Comments List */}
-                    {commentsLoading[post._id] ? (
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading comments...</p>
-                    ) : commentsMap[post._id]?.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {commentsMap[post._id].map(comment => {
-                          const isCommentAuthor = user && comment.author?._id === user._id;
-                          return (
-                            <div key={comment._id} className="glass-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                                    {comment.author?.name || 'Anonymous User'}
-                                  </span>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    {new Date(comment.createdAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                {isCommentAuthor && (
-                                  <button 
-                                    className="btn btn-secondary btn-icon" 
-                                    style={{ border: 'none', background: 'transparent', color: 'var(--danger)', padding: '0.1rem' }}
-                                    onClick={() => handleDeleteComment(post._id, comment._id)}
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                )}
-                              </div>
-                              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
-                                {comment.content}
-                              </p>
-                            </div>
-                          );
-                        })}
+                    {/* Image */}
+                    {post.image && (
+                      <div style={{ width: '100%', maxHeight: '420px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                        <img 
+                          src={post.image.startsWith('http') ? post.image : `${window.location.origin}${post.image}`} 
+                          alt="Post attachment" 
+                          style={{ width: '100%', maxHeight: '420px', objectFit: 'cover' }}
+                        />
                       </div>
-                    ) : (
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                        No comments yet. Start the discussion!
-                      </p>
                     )}
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          No awareness postings currently found in local directory database.
-        </div>
+
+                    {/* Workshop Mentions Badge */}
+                    {post.mentionedWorkshop && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <span 
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontWeight: '600', cursor: 'pointer', background: 'rgba(0,229,255,0.07)', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.85rem' }}
+                          onClick={() => {
+                            setSelectedWorkshopId(post.mentionedWorkshop._id);
+                            setPage('learning-portal');
+                          }}
+                        >
+                          <BookOpen size={14} /> @ {post.mentionedWorkshop.title}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Actions Footer */}
+                    <div style={{ display: 'flex', gap: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ background: 'transparent', border: 'none', color: hasLiked ? 'var(--accent-cyan)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}
+                        onClick={() => handleLike(post._id)}
+                      >
+                        <Heart size={18} fill={hasLiked ? 'var(--accent-cyan)' : 'transparent'} /> {post.likesCount || 0} Likes
+                      </button>
+
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}
+                        onClick={() => setSelectedPost(post)}
+                      >
+                        <MessageSquare size={18} /> {post.commentsCount || 0} Comments
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No awareness postings currently found in local directory database.
+            </div>
+          )}
+        </>
       )}
     </div>
   );
