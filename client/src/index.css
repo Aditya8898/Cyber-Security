@@ -135,8 +135,10 @@ a:hover {
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
   display: flex;
+  flex-wrap: nowrap;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
 }
 
 .brand {
@@ -150,10 +152,12 @@ a:hover {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .nav-links {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 1.5rem;
   list-style: none;
@@ -167,6 +171,7 @@ a:hover {
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
   transition: var(--transition-fast);
+  white-space: nowrap;
 }
 
 .nav-item:hover, .nav-item.active {
@@ -178,15 +183,37 @@ a:hover {
   border-left: 2px solid var(--accent-cyan);
 }
 
+/* Pending review notification badge on nav items */
+.nav-notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #080c14;
+  background: linear-gradient(135deg, #eab308, #f97316);
+  border-radius: 10px;
+  vertical-align: middle;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+}
+
 .nav-menu-wrapper {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2rem;
+  min-width: 0;
 }
 
 .auth-button-container {
   display: flex;
   gap: 0.75rem;
+  white-space: nowrap;
 }
 
 /* Button System */
@@ -203,6 +230,7 @@ a:hover {
   transition: var(--transition-fast);
   border: none;
   font-family: var(--font-body);
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -390,6 +418,11 @@ a:hover {
   width: 95%;
 }
 
+.modal-content.review {
+  max-width: 820px;
+  width: 95%;
+}
+
 @keyframes scaleUp {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -554,7 +587,8 @@ a:hover {
 .article-cover {
   width: 100%;
   max-height: 380px;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--bg-tertiary);
   border-radius: var(--radius-md);
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-color);
@@ -990,10 +1024,26 @@ a:hover {
 .welcome-text {
   font-size: 0.9rem;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 /* Syllabus Sidebar drawer toggle */
 .mobile-sidebar-toggle {
+  display: none;
+}
+
+/* Mobile drawer scrims (tap outside to dismiss) */
+.mobile-menu-backdrop,
+.sidebar-backdrop {
+  position: fixed;
+  top: 70px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 998;
   display: none;
 }
 
@@ -1004,57 +1054,38 @@ a:hover {
   }
 }
 
-/* Media Queries for Viewports: 992px and below */
-@media (max-width: 992px) {
-  .learning-portal-layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .article-reader-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* Learning Sidebar Drawer Mode */
-  .mobile-sidebar-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    margin-bottom: 1.5rem;
-    z-index: 10;
-  }
-
-  .portal-sidebar {
-    position: fixed;
-    top: 70px;
-    left: -320px;
-    width: 300px;
-    height: calc(100vh - 70px);
-    z-index: 999;
-    background: #080c14;
-    border-right: 1px solid var(--border-color);
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .portal-sidebar.open {
-    left: 0;
-  }
-}
-
-/* Media Queries for Viewports: 768px and below (Mobile / Tablet) */
-@media (max-width: 768px) {
-  /* Navbar Drawer Overrides */
+/* Media Queries for Viewports: 1280px and below (compact desktop header) */
+@media (max-width: 1280px) {
   .navbar {
     padding: 1rem 1.5rem;
   }
 
+  .nav-links {
+    gap: 0.75rem;
+  }
+
+  .nav-menu-wrapper {
+    gap: 1.5rem;
+  }
+
+  .nav-item {
+    font-size: 0.88rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .brand {
+    font-size: 1.3rem;
+  }
+}
+
+/* Media Queries for Viewports: 1200px and below (desktop -> tablet) */
+@media (max-width: 1200px) {
+  /* Navbar -> Hamburger drawer */
   .mobile-menu-toggle {
+    display: block;
+  }
+
+  .mobile-menu-backdrop {
     display: block;
   }
 
@@ -1066,6 +1097,7 @@ a:hover {
     height: calc(100vh - 70px);
     background: rgba(8, 12, 20, 0.98);
     backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     display: flex;
     flex-direction: column;
     padding: 2rem 1.5rem;
@@ -1073,6 +1105,8 @@ a:hover {
     transition: left 0.3s ease;
     z-index: 999;
     border-top: 1px solid var(--border-color);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav-menu-wrapper.open {
@@ -1096,12 +1130,71 @@ a:hover {
     width: 100%;
     margin-top: auto;
   }
-  
+
   .user-nav-profile {
     flex-direction: column;
     width: 100%;
     gap: 1rem;
     align-items: stretch;
+  }
+}
+
+/* Media Queries for Viewports: 992px and below */
+@media (max-width: 992px) {
+  .learning-portal-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .article-reader-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Learning Sidebar Drawer Mode */
+  .mobile-sidebar-toggle {
+    position: sticky;
+    top: 72px;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-bottom: 1.5rem;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+  }
+
+  .portal-sidebar {
+    position: fixed;
+    top: 70px;
+    left: -320px;
+    width: 300px;
+    height: calc(100vh - 70px);
+    z-index: 999;
+    background: #080c14;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .portal-sidebar.open {
+    left: 0;
+  }
+}
+
+/* Media Queries for Viewports: 768px and below (Mobile / Tablet) */
+@media (max-width: 768px) {
+  /* Navbar refinement */
+  .navbar {
+    padding: 1rem 1.5rem;
   }
 
   /* Grid Conversions */

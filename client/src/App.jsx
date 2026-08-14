@@ -17,6 +17,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pendingBlogCount, setPendingBlogCount] = useState(0);
+  const [adminNavTarget, setAdminNavTarget] = useState(null);
 
   // Detail view parameters
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
@@ -88,6 +90,47 @@ export default function App() {
     checkSession();
     checkDatabaseStatus();
   }, []);
+
+  // Refresh the admin pending-blog-review badge count using the real API
+  const refreshPendingBlogCount = async () => {
+    if (!user || user.role !== 'admin') {
+      setPendingBlogCount(0);
+      return;
+    }
+    try {
+      const res = await api.get('/blogs/admin?status=pending');
+      if (res.success) {
+        setPendingBlogCount(res.total || res.data?.length || 0);
+      } else {
+        setPendingBlogCount(0);
+      }
+    } catch (err) {
+      setPendingBlogCount(0);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      refreshPendingBlogCount();
+    }
+  }, [user]);
+
+  // Keep the badge fresh while the admin is working in the console
+  useEffect(() => {
+    if (page === 'admin') {
+      refreshPendingBlogCount();
+    }
+  }, [page]);
+
+  const handleAdminNavClick = () => {
+    setPage('admin');
+    setSelectedWorkshopId(null);
+    setSelectedArticleId(null);
+    setMobileMenuOpen(false);
+    if (pendingBlogCount > 0) {
+      setAdminNavTarget('community');
+    }
+  };
 
   // Handle Login & Signup
   const handleAuthSubmit = async (e) => {
@@ -205,7 +248,14 @@ export default function App() {
           />
         );
       case 'admin':
-        return <AdminPanel addToast={addToast} />;
+        return (
+          <AdminPanel 
+            addToast={addToast} 
+            requestedTab={adminNavTarget}
+            onRequestedTabHandled={() => setAdminNavTarget(null)}
+            refreshPendingCount={refreshPendingBlogCount}
+          />
+        );
       case 'community':
         return (
           <Community 
@@ -268,7 +318,14 @@ export default function App() {
             )}
 
             {user?.role === 'admin' && (
-              <li className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={() => { navigateToPage('admin'); setMobileMenuOpen(false); }}>Admin Control</li>
+              <li className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={handleAdminNavClick}>
+                Admin Control
+                {pendingBlogCount > 0 && (
+                  <span className="nav-notification-badge" title={`${pendingBlogCount} pending community post${pendingBlogCount === 1 ? '' : 's'} awaiting review`}>
+                    {pendingBlogCount}
+                  </span>
+                )}
+              </li>
             )}
           </ul>
 
@@ -287,6 +344,9 @@ export default function App() {
             )}
           </div>
         </nav>
+        {mobileMenuOpen && (
+          <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)}></div>
+        )}
       </header>
 
       {/* Main Pages */}

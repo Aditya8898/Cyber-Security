@@ -367,8 +367,7 @@ export default function Community({ user, setPage, setSelectedWorkshopId, addToa
 
       const res = await api.post('/blogs', formData, true);
       if (res.success && res.data) {
-        addToast('Post published successfully!', 'success');
-        setPosts(prev => [res.data, ...prev]);
+        addToast('Blog submitted for admin review.', 'success');
         
         // Reset states
         setTitle('');

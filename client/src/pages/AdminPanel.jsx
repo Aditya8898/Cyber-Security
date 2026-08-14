@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit, Trash2, Database, BookOpen, AlertTriangle, FileText, CheckSquare, Upload, HelpCircle, Activity, Pin, MessageSquare } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Database, BookOpen, AlertTriangle, FileText, CheckSquare, Upload, HelpCircle, Activity, Pin, MessageSquare, Check, X, Eye, Calendar, Heart } from 'lucide-react';
 import { api } from '../utils/api';
 
-export default function AdminPanel({ addToast }) {
+export default function AdminPanel({ addToast, requestedTab = null, onRequestedTabHandled, refreshPendingCount }) {
   const [adminTab, setAdminTab] = useState('overview');
+  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected'
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -15,6 +16,7 @@ export default function AdminPanel({ addToast }) {
   const [quizzes, setQuizzes] = useState([]);
   const [communityPosts, setCommunityPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [selectedReviewPost, setSelectedReviewPost] = useState(null);
 
   // Selected targets for sub-management
   const [selectedWorkshopId, setSelectedWorkshopId] = useState('');
@@ -51,10 +53,18 @@ export default function AdminPanel({ addToast }) {
     loadDashboard();
   }, []);
 
+  // Allow the top navigation to deep-link straight into a moderation tab
+  useEffect(() => {
+    if (requestedTab) {
+      setAdminTab(requestedTab);
+      if (onRequestedTabHandled) onRequestedTabHandled();
+    }
+  }, [requestedTab, onRequestedTabHandled]);
+
   const fetchAllCommunityPosts = async () => {
     setPostsLoading(true);
     try {
-      const res = await api.get('/blogs');
+      const res = await api.get(`/blogs/admin?status=${statusFilter}`);
       if (res.success && res.data) {
         setCommunityPosts(res.data);
       }
@@ -69,13 +79,45 @@ export default function AdminPanel({ addToast }) {
     if (adminTab === 'community') {
       fetchAllCommunityPosts();
     }
-  }, [adminTab]);
+  }, [adminTab, statusFilter]);
+
+  const handleApprovePost = async (postId) => {
+    if (!window.confirm("Are you sure you want to approve this community post?")) return;
+    try {
+      const res = await api.patch(`/blogs/${postId}/approve`);
+      if (res.success) {
+        addToast("Post approved successfully", "success");
+        if (selectedReviewPost?._id === postId) setSelectedReviewPost(null);
+        fetchAllCommunityPosts();
+        if (refreshPendingCount) refreshPendingCount();
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to approve post", "error");
+    }
+  };
+
+  const handleRejectPost = async (postId) => {
+    if (!window.confirm("Are you sure you want to reject this community post?")) return;
+    try {
+      const res = await api.patch(`/blogs/${postId}/reject`);
+      if (res.success) {
+        addToast("Post rejected successfully", "success");
+        if (selectedReviewPost?._id === postId) setSelectedReviewPost(null);
+        fetchAllCommunityPosts();
+        if (refreshPendingCount) refreshPendingCount();
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to reject post", "error");
+    }
+  };
 
   const handlePinPost = async (postId) => {
+    if (!window.confirm("Are you sure you want to pin this community post? This will unpin any currently pinned post.")) return;
     try {
       const res = await api.patch(`/blogs/${postId}/pin`);
       if (res.success) {
         addToast("Post pinned successfully", "success");
+        if (selectedReviewPost?._id === postId) setSelectedReviewPost(prev => ({ ...prev, isPinned: true }));
         fetchAllCommunityPosts();
       }
     } catch (err) {
@@ -84,10 +126,12 @@ export default function AdminPanel({ addToast }) {
   };
 
   const handleUnpinPost = async (postId) => {
+    if (!window.confirm("Are you sure you want to unpin this community post?")) return;
     try {
       const res = await api.patch(`/blogs/${postId}/unpin`);
       if (res.success) {
         addToast("Post unpinned successfully", "success");
+        if (selectedReviewPost?._id === postId) setSelectedReviewPost(prev => ({ ...prev, isPinned: false }));
         fetchAllCommunityPosts();
       }
     } catch (err) {
@@ -101,7 +145,9 @@ export default function AdminPanel({ addToast }) {
       const res = await api.delete(`/blogs/admin/${postId}`);
       if (res.success) {
         addToast("Community post deleted successfully", "success");
+        if (selectedReviewPost?._id === postId) setSelectedReviewPost(null);
         setCommunityPosts(prev => prev.filter(p => p._id !== postId));
+        if (refreshPendingCount) refreshPendingCount();
       }
     } catch (err) {
       addToast(err.message || "Failed to delete post", "error");
@@ -1138,8 +1184,31 @@ export default function AdminPanel({ addToast }) {
       {/* Community Management Tab */}
       {adminTab === 'community' && (
         <div>
-          <div className="admin-section-header">
+          <div className="admin-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h2>Community Post Moderation</h2>
+            <div className="tab-nav" style={{ display: 'inline-flex', background: 'var(--bg-secondary)', padding: '0.25rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', gap: '0.25rem', margin: 0 }}>
+              <button 
+                className={`tab-btn ${statusFilter === 'pending' ? 'active' : ''}`}
+                style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                onClick={() => setStatusFilter('pending')}
+              >
+                🟡 Pending
+              </button>
+              <button 
+                className={`tab-btn ${statusFilter === 'approved' ? 'active' : ''}`}
+                style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                onClick={() => setStatusFilter('approved')}
+              >
+                🟢 Approved
+              </button>
+              <button 
+                className={`tab-btn ${statusFilter === 'rejected' ? 'active' : ''}`}
+                style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                onClick={() => setStatusFilter('rejected')}
+              >
+                🔴 Rejected
+              </button>
+            </div>
           </div>
 
           {postsLoading ? (
@@ -1154,6 +1223,7 @@ export default function AdminPanel({ addToast }) {
                     <th>Mentioned Workshop</th>
                     <th>Likes</th>
                     <th>Comments</th>
+                    <th>Status</th>
                     <th>Pinned</th>
                     <th>Actions</th>
                   </tr>
@@ -1174,28 +1244,98 @@ export default function AdminPanel({ addToast }) {
                       </td>
                       <td data-label="Likes">{post.likesCount || 0}</td>
                       <td data-label="Comments">{post.commentsCount || 0}</td>
+                      <td data-label="Status">
+                        {post.status === 'pending' && (
+                          <span className="tag" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderColor: 'rgba(234, 179, 8, 0.3)' }}>
+                            Pending
+                          </span>
+                        )}
+                        {post.status === 'approved' && (
+                          <span className="tag" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+                            Approved
+                          </span>
+                        )}
+                        {post.status === 'rejected' && (
+                          <span className="tag" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                            Rejected
+                          </span>
+                        )}
+                      </td>
                       <td data-label="Pinned">{post.isPinned ? "Yes" : "No"}</td>
                       <td data-label="Actions">
-                        <div className="action-links">
-                          {post.isPinned ? (
+                        <div className="action-links" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.4rem' }} 
+                            onClick={() => setSelectedReviewPost(post)}
+                            title="Review Full Post"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          {post.status === 'pending' && (
+                            <>
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: '0.4rem', color: 'var(--success)' }} 
+                                onClick={() => handleApprovePost(post._id)}
+                                title="Approve Post"
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: '0.4rem', color: 'var(--danger)' }} 
+                                onClick={() => handleRejectPost(post._id)}
+                                title="Reject Post"
+                              >
+                                <X size={14} />
+                              </button>
+                            </>
+                          )}
+                          
+                          {post.status === 'approved' && (
+                            <>
+                              {post.isPinned ? (
+                                <button 
+                                  className="btn btn-secondary" 
+                                  style={{ padding: '0.4rem', color: 'var(--warning)' }} 
+                                  onClick={() => handleUnpinPost(post._id)}
+                                  title="Unpin Post"
+                                >
+                                  <Pin size={14} fill="var(--warning)" />
+                                </button>
+                              ) : (
+                                <button 
+                                  className="btn btn-secondary" 
+                                  style={{ padding: '0.4rem' }} 
+                                  onClick={() => handlePinPost(post._id)}
+                                  title="Pin Post"
+                                >
+                                  <Pin size={14} />
+                                </button>
+                              )}
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: '0.4rem', color: 'var(--danger)' }} 
+                                onClick={() => handleRejectPost(post._id)}
+                                title="Reject Post"
+                              >
+                                <X size={14} />
+                              </button>
+                            </>
+                          )}
+
+                          {post.status === 'rejected' && (
                             <button 
                               className="btn btn-secondary" 
-                              style={{ padding: '0.4rem', color: 'var(--warning)' }} 
-                              onClick={() => handleUnpinPost(post._id)}
-                              title="Unpin Post"
+                              style={{ padding: '0.4rem', color: 'var(--success)' }} 
+                              onClick={() => handleApprovePost(post._id)}
+                              title="Approve Post"
                             >
-                              <Pin size={14} fill="var(--warning)" />
-                            </button>
-                          ) : (
-                            <button 
-                              className="btn btn-secondary" 
-                              style={{ padding: '0.4rem' }} 
-                              onClick={() => handlePinPost(post._id)}
-                              title="Pin Post"
-                            >
-                              <Pin size={14} />
+                              <Check size={14} />
                             </button>
                           )}
+
                           <button 
                             className="btn btn-secondary" 
                             style={{ padding: '0.4rem', color: 'var(--danger)' }} 
@@ -1210,13 +1350,120 @@ export default function AdminPanel({ addToast }) {
                   ))}
                   {communityPosts.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No community posts have been published yet.</td>
+                      <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No community posts found in this status category.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Community Post Review Modal */}
+      {selectedReviewPost && (
+        <div className="modal-backdrop" onClick={() => setSelectedReviewPost(null)}>
+          <div className="modal-content glass-panel review" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="btn btn-secondary btn-icon" 
+              style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none' }}
+              onClick={() => setSelectedReviewPost(null)}
+              title="Close Review"
+            >
+              <X size={18} />
+            </button>
+
+            <h2 style={{ fontSize: '1.6rem', marginBottom: '1rem', paddingRight: '2rem', lineHeight: '1.3' }}>{selectedReviewPost.title}</h2>
+
+            {/* Meta info */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Shield size={14} style={{ color: 'var(--accent-cyan)' }} />
+                <strong style={{ color: 'var(--text-primary)' }}>{selectedReviewPost.author?.name || 'Anonymous User'}</strong>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Calendar size={14} /> {new Date(selectedReviewPost.createdAt).toLocaleDateString()}
+              </span>
+              {selectedReviewPost.mentionedWorkshop && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)' }}>
+                  <BookOpen size={14} /> @ {selectedReviewPost.mentionedWorkshop.title}
+                </span>
+              )}
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Heart size={14} /> {selectedReviewPost.likesCount || 0} Likes
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <MessageSquare size={14} /> {selectedReviewPost.commentsCount || 0} Comments
+              </span>
+              <span>
+                {selectedReviewPost.status === 'pending' && (
+                  <span className="tag" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderColor: 'rgba(234, 179, 8, 0.3)' }}>
+                    Pending Review
+                  </span>
+                )}
+                {selectedReviewPost.status === 'approved' && (
+                  <span className="tag" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+                    Approved
+                  </span>
+                )}
+                {selectedReviewPost.status === 'rejected' && (
+                  <span className="tag" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                    Rejected
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Full image preview */}
+            {selectedReviewPost.image && (
+              <div style={{ width: '100%', maxHeight: '420px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+                <img 
+                  src={selectedReviewPost.image.startsWith('http') ? selectedReviewPost.image : `${window.location.origin}${selectedReviewPost.image}`} 
+                  alt="Post attachment" 
+                  style={{ width: '100%', maxHeight: '420px', objectFit: 'contain' }}
+                />
+              </div>
+            )}
+
+            {/* Full content */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', whiteSpace: 'pre-wrap', lineHeight: '1.7' }}>
+                {selectedReviewPost.content}
+              </p>
+            </div>
+
+            {/* Moderation actions */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+              {selectedReviewPost.status === 'pending' && (
+                <>
+                  <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={() => handleApprovePost(selectedReviewPost._id)}>
+                    <Check size={16} /> Approve
+                  </button>
+                  <button className="btn btn-secondary" style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.4)' }} onClick={() => handleRejectPost(selectedReviewPost._id)}>
+                    <X size={16} /> Reject
+                  </button>
+                </>
+              )}
+              {selectedReviewPost.status === 'approved' && (
+                <>
+                  <button className="btn btn-secondary" style={{ color: 'var(--warning)', borderColor: 'rgba(234, 179, 8, 0.4)' }} onClick={() => selectedReviewPost.isPinned ? handleUnpinPost(selectedReviewPost._id) : handlePinPost(selectedReviewPost._id)}>
+                    <Pin size={16} fill={selectedReviewPost.isPinned ? 'var(--warning)' : 'transparent'} /> {selectedReviewPost.isPinned ? 'Unpin' : 'Pin'}
+                  </button>
+                  <button className="btn btn-secondary" style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.4)' }} onClick={() => handleRejectPost(selectedReviewPost._id)}>
+                    <X size={16} /> Reject
+                  </button>
+                </>
+              )}
+              {selectedReviewPost.status === 'rejected' && (
+                <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={() => handleApprovePost(selectedReviewPost._id)}>
+                  <Check size={16} /> Approve
+                </button>
+              )}
+              <button className="btn btn-danger" onClick={() => handleDeleteCommunityPost(selectedReviewPost._id)}>
+                <Trash2 size={16} /> Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

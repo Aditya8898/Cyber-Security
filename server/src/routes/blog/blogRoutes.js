@@ -10,6 +10,9 @@ import {
     pinBlogPost,
     unpinBlogPost,
     adminDeleteBlogPost,
+    getAdminBlogPosts,
+    approveBlogPost,
+    rejectBlogPost,
 } from "../../controllers/blog/blogController.js";
 
 import authMiddleware from "../../middleware/authMiddleware.js";
@@ -17,6 +20,14 @@ import adminMiddleware from "../../middleware/adminMiddleware.js";
 import upload from "../../middleware/uploadMiddleware.js";
 
 const router = express.Router();
+
+// Admin
+router.get(
+    "/admin",
+    authMiddleware,
+    adminMiddleware,
+    getAdminBlogPosts
+);
 
 // Public
 router.get("/", getAllBlogPosts);
@@ -61,6 +72,20 @@ router.patch(
     authMiddleware,
     adminMiddleware,
     unpinBlogPost
+);
+
+router.patch(
+    "/:id/approve",
+    authMiddleware,
+    adminMiddleware,
+    approveBlogPost
+);
+
+router.patch(
+    "/:id/reject",
+    authMiddleware,
+    adminMiddleware,
+    rejectBlogPost
 );
 
 router.delete(

@@ -23,6 +23,13 @@ export const addComment = async (req, res) => {
             });
         }
 
+        if (post.status !== "approved") {
+            return res.status(403).json({
+                success: false,
+                message: "Comments are only allowed on approved posts",
+            });
+        }
+
         const comment = await Comment.create({
             post: post._id,
             author: req.user._id,
@@ -50,6 +57,22 @@ export const addComment = async (req, res) => {
 // GET COMMENTS
 export const getComments = async (req, res) => {
     try {
+        const post = await BlogPost.findById(req.params.postId);
+
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Blog Post not found",
+            });
+        }
+
+        if (post.status !== "approved") {
+            return res.status(404).json({
+                success: false,
+                message: "Blog Post not found",
+            });
+        }
+
         const comments = await Comment.find({
             post: req.params.postId,
         })

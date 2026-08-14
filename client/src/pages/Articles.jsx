@@ -195,7 +195,7 @@ export default function Articles({ selectedArticleId, setSelectedArticleId, addT
                   <img 
                     src={article.coverImage.startsWith('http') ? article.coverImage : `${window.location.origin}${article.coverImage}`} 
                     alt={article.title}
-                    style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '1rem' }} 
+                    style={{ width: '100%', height: '160px', objectFit: 'contain', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem' }} 
                   />
                 )}
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>

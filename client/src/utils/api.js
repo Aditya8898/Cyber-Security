@@ -39,11 +39,14 @@ const handleResponse = async (response) => {
   return data;
 };
 
+const NO_CACHE = { cache: 'no-store' };
+
 export const api = {
   async get(endpoint) {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'GET',
       headers: getHeaders(),
+      ...NO_CACHE,
     });
     return handleResponse(response);
   },
@@ -53,6 +56,7 @@ export const api = {
       method: 'POST',
       headers: getHeaders(isMultipart),
       body: isMultipart ? body : JSON.stringify(body),
+      ...NO_CACHE,
     });
     return handleResponse(response);
   },
@@ -62,6 +66,7 @@ export const api = {
       method: 'PUT',
       headers: getHeaders(isMultipart),
       body: isMultipart ? body : JSON.stringify(body),
+      ...NO_CACHE,
     });
     return handleResponse(response);
   },
@@ -71,6 +76,7 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(body),
+      ...NO_CACHE,
     });
     return handleResponse(response);
   },
@@ -79,6 +85,7 @@ export const api = {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
       headers: getHeaders(),
+      ...NO_CACHE,
     });
     return handleResponse(response);
   },

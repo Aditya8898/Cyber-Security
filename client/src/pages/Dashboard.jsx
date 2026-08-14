@@ -288,7 +288,24 @@ export default function Dashboard({ user, setUser, setPage, setSelectedWorkshopI
                   {myPosts.map(post => (
                     <div key={post._id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
                       <div style={{ flex: 1, minWidth: '240px' }}>
-                        <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>{post.title}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{post.title}</h3>
+                          {post.status === 'pending' && (
+                            <span className="tag" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderColor: 'rgba(234, 179, 8, 0.3)' }}>
+                              🟡 Pending Review
+                            </span>
+                          )}
+                          {post.status === 'approved' && (
+                            <span className="tag" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+                              🟢 Published
+                            </span>
+                          )}
+                          {post.status === 'rejected' && (
+                            <span className="tag" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                              🔴 Rejected
+                            </span>
+                          )}
+                        </div>
                         <div style={{ display: 'flex', gap: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', flexWrap: 'wrap' }}>
                           <span>Published: {new Date(post.createdAt).toLocaleDateString()}</span>
                           <span>Likes: {post.likesCount || 0}</span>

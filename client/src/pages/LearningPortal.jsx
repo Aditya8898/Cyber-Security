@@ -286,6 +286,10 @@ export default function LearningPortal({ user, workshopId, setPage, addToast }) 
         </nav>
       </aside>
 
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>
+      )}
+
       {/* Reader Panel / Content Area */}
       <main className="glass-panel portal-reader">
         {quizMode ? (
